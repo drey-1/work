@@ -1,0 +1,130 @@
+<?php
+
+namespace App\Http\Controllers\API;
+
+use App\artisantype;
+use App\Http\Controllers\Controller;
+use Illuminate\Http\Request;
+use Auth;
+use Illuminate\Support\Facades\DB;
+class artisan_type extends Controller
+{
+    public function types_car(Request $request){
+        $user=Auth::user();
+        $coun=DB::table('countries')->get();
+       // $curr=$coun->currrency_symbol;
+        $data = DB::table('artisantypes')->SELECT ("id AS car_ID,artisantype AS car_name,max_seat AS max_size,image AS car_image ")->where ('status', '=','1')->get();
+        
+        //echo $this->db->last_query();
+        $result = $data;
+
+        foreach($result as $rs) {
+
+
+              //print_r($rs);
+              $pattern = $this->get_pattern($rs->car_ID);
+              //print_r($pattern);
+
+              if (!empty($pattern)) {
+                    foreach($pattern as $res) {
+                          //print_r($res);
+
+                          if ($res->lat == '' || $res->lng == '') {
+                                continue;
+                          }
+
+                          $check_in_range = $this->check_range($res, $request);
+                          if ($check_in_range) {
+                                $rs->min_fare = $res->currency.$res->base_price;
+                                // $rs->car_ID = $res->id;
+                                break;
+                          }
+                    }
+              } else {
+                    $rs->fare = 0;
+                    // $new_res[] = 0;
+              }
+      }
+
+              return response()->json([
+                'status' => 'success',
+                'message' => 'update saved',
+                'data' =>$res,
+                ] , 200);
+                
+              }
+                  
+         
+    }
+
+
+
+
+    
+   function get_pattern($car_type) {
+
+        //print_r($car_type);
+
+        // $this->db->where('id','1')->get('car_type');
+        $query=DB::table('pattern')-> select('pattern.*,CONVERT(pattern.currency USING utf8) AS new_currency')->where('art_type', $car_type)->get();
+
+        return $query;
+        //echo $this->db->last_query();
+
+  }
+  function check_in_range(Request $rs, Request $rq) {
+
+    $latitude2 = $rq->source_latitude;
+
+    $longitude2 = $rq->source_longitude;
+
+    $latitude1 = $rs->lat;
+
+    $longitude1 = $rs->lng;
+
+    $range = $this->getDistance($latitude1, $longitude1, $latitude2, $longitude2);
+
+    if ($range <= $rs->range) {
+
+          $latitude2 = $rq->destination_latitude;
+
+          $longitude2 = $rq->destination_longitude;
+
+          $range = $this->getDistance($latitude1, $longitude1, $latitude2, $longitude2);
+
+          if ($range <= $rs->range) {
+
+                return true;
+
+          } else {
+
+                return false;
+
+          }
+
+    } else {
+
+          return false;
+
+    }
+
+}
+function getDistance($latitude1, $longitude1, $latitude2, $longitude2) {
+
+    $earth_radius = 6371;
+
+    $dLat = deg2rad($latitude2 - $latitude1);
+
+    $dLon = deg2rad($longitude2 - $longitude1);
+
+    $a = sin($dLat / 2) * sin($dLat / 2) + cos(deg2rad($latitude1)) * cos(deg2rad($latitude2)) * sin($dLon / 2) * sin($dLon / 2);
+
+    $c = 2 * asin(sqrt($a));
+
+    $d = $earth_radius * $c;
+
+    return $d;
+
+}
+
+
